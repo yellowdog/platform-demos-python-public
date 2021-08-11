@@ -1,0 +1,10 @@
+{
+  "nodes": [
+{{#otherNodes}}
+    {
+      "name": "slurmd{{details.nodeSlot}}",
+      "ip": "{{details.privateIpAddress}}"
+    }{{^-last}},{{/-last}}
+{{/otherNodes}}
+  ]
+}

@@ -1,0 +1,10 @@
+.idea/
+*.iml
+
+__pycache__/
+venv/
+
+out/
+notebooks/
+.ipynb_checkpoints/
+*.ipynb
