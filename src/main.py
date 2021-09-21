@@ -48,6 +48,7 @@ def set_environment(arguments):
     if arguments.template_id:
         os.environ["TEMPLATE_ID"] = arguments.template_id
     os.environ["AUTO_SHUTDOWN"] = str(arguments.disable_auto_shutdown)
+    os.environ["PYTHONPATH"] = ".."
 
 
 def add_common_arguments(argument_parser: ArgumentParser):
