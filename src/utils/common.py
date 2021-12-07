@@ -3,6 +3,7 @@ import os
 import re
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional, Union
 from urllib.parse import urlparse
 
@@ -11,7 +12,7 @@ from IPython import get_ipython
 from IPython.display import display, Markdown
 from yellowdog_client import PlatformClient
 from yellowdog_client.model import ComputeRequirementTemplate, WorkRequirement, ComputeRequirement, \
-    ConfiguredWorkerPool, ProvisionedWorkerPool
+    ConfiguredWorkerPool, ProvisionedWorkerPool, MachineImageFamilySearch
 
 
 def generate_unique_name(prefix: str) -> str:
@@ -32,6 +33,23 @@ def use_template(
             yield template.id
         finally:
             client.compute_client.delete_compute_requirement_template(template)
+
+
+def get_image_family_id(client: PlatformClient, image_family: str) -> str:
+    image_families = client.images_client.search_image_families(MachineImageFamilySearch(
+        includePublic=True,
+        namespace="YellowDog",
+        familyName=image_family
+    ))
+
+    image_families = [i for i in image_families if i.name == image_family]
+
+    if not image_families:
+        raise Exception("Unable to find ID for image family: " + image_family)
+    elif len(image_families) > 1:
+        raise Exception("Multiple matching image families found")
+
+    return image_families[0].id
 
 
 def camel_case_split(value: str) -> str:
@@ -102,5 +120,5 @@ def link_entity(base_url: str, entity: object) -> str:
     )
 
 
-def script_relative_path(path: str) -> str:
-    return os.path.join(os.path.dirname(os.path.dirname(__file__)), path)
+def script_relative_path(path: str) -> Path:
+    return Path(__file__).parents[1] / Path(path)

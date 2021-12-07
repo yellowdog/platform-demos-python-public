@@ -21,16 +21,17 @@
 
 # %%
 import os
+from datetime import timedelta
 
 from yellowdog_client import PlatformClient
 from yellowdog_client.common.server_sent_events import DelegatedSubscriptionEventListener
 from yellowdog_client.object_store.model import FileTransferStatus
-from yellowdog_client.model import ServicesSchema, ApiKey, ComputeRequirementDynamicTemplate, \
-    StringAttributeConstraint, WorkRequirement, TaskGroup, RunSpecification, Task, TaskInput, TaskOutput, FlattenPath, \
-    ComputeRequirementTemplateUsage, ProvisionedWorkerPoolProperties, WorkRequirementStatus, TaskStatus, \
-    TaskInputSource, TaskOutputSource, WorkerClaimBehaviour, MachineImageFamilySearch
+from yellowdog_client.model import ServicesSchema, ApiKey, ComputeRequirementDynamicTemplate,\
+    StringAttributeConstraint, WorkRequirement, TaskGroup, RunSpecification, Task, TaskInput, TaskOutput, FlattenPath,\
+    ComputeRequirementTemplateUsage, ProvisionedWorkerPoolProperties, WorkRequirementStatus, TaskStatus
 
-from utils.common import generate_unique_name, markdown, link, link_entity, use_template, image, script_relative_path
+from utils.common import generate_unique_name, markdown, link, link_entity, use_template, image, script_relative_path, \
+    get_image_family_id
 
 key = os.environ['KEY']
 secret = os.environ['SECRET']
@@ -46,25 +47,12 @@ client = PlatformClient.create(
     ApiKey(key, secret)
 )
 
-image_family = "yd-agent-docker"
-
-images = client.images_client.search_image_families(MachineImageFamilySearch(
-    includePublic=True,
-    namespace="YellowDog",
-    familyName=image_family
-))
-
-images = [image for image in images if image.name == image_family]
-
-if not images:
-    raise Exception("Unable to find ID for image family: " + image_family)
-elif len(images) > 1:
-    raise Exception("Multiple matching image families found")
+image_family_id = get_image_family_id(client, "yd-agent-docker")
 
 default_template = ComputeRequirementDynamicTemplate(
     name=run_id,
     strategyType='co.yellowdog.platform.model.SingleSourceProvisionStrategy',
-    imagesId=images[0].id,
+    imagesId=image_family_id,
     constraints=[
         StringAttributeConstraint(attribute='source.provider', anyOf={'AWS'}),
         StringAttributeConstraint(attribute='source.instanceType', anyOf={"t3a.small"})
@@ -78,9 +66,9 @@ markdown("Configured to run against", link(url))
 
 # %%
 source_picture_path = script_relative_path("resources/ImageMontage.jpg")
-source_picture_file = os.path.basename(source_picture_path)
+source_picture_file = source_picture_path.name
 client.object_store_client.start_transfers()
-session = client.object_store_client.create_upload_session(namespace, source_picture_path)
+session = client.object_store_client.create_upload_session(namespace, str(source_picture_path))
 markdown("Waiting for source picture to upload to Object Store...")
 session.start()
 session = session.when_status_matches(lambda status: status.is_finished()).result()
@@ -110,6 +98,7 @@ with use_template(client, template_id, default_template) as template_id:
         ),
         ProvisionedWorkerPoolProperties(
             workerTag=run_id,
+            nodeIdleTimeLimit=timedelta(0),
             autoShutdown=auto_shutdown
         )
     )
@@ -130,25 +119,19 @@ work_requirement = WorkRequirement(
         TaskGroup(
             name=image_processors_task_group_name,
             runSpecification=RunSpecification(
-                minimumQueueConcurrency=5,
-                idealQueueConcurrency=5,
-                workerClaimBehaviour=WorkerClaimBehaviour.MAINTAIN_IDEAL,
                 taskTypes=["docker"],
                 maximumTaskRetries=3,
-                workerTags=[run_id],
-                shareWorkers=True
+                minWorkers=4,
+                maxWorkers=4,
+                workerTags=[run_id]
             )
         ),
         TaskGroup(
             name=montage_task_group_name,
             runSpecification=RunSpecification(
-                minimumQueueConcurrency=1,
-                idealQueueConcurrency=1,
-                workerClaimBehaviour=WorkerClaimBehaviour.MAINTAIN_IDEAL,
                 taskTypes=["docker"],
                 maximumTaskRetries=3,
-                workerTags=[run_id],
-                shareWorkers=True
+                workerTags=[run_id]
             ),
             dependentOn=image_processors_task_group_name,
         )
@@ -168,11 +151,17 @@ def generate_task(task_name: str, conversion: str, output_file: str) -> Task:
     return Task(
         name=task_name,
         taskType="docker",
-        inputs=[TaskInput(TaskInputSource.TASK_NAMESPACE, source_picture_file)],
-        taskData=f"v4tech/imagemagick convert {conversion} /yd_working/{source_picture_file} /yd_working/{output_file}",
+        inputs=[TaskInput.from_task_namespace(source_picture_file, True)],
+        arguments=[
+            "v4tech/imagemagick",
+            "convert",
+            conversion,
+            f"/yd_working/{source_picture_file}",
+            f"/yd_working/{output_file}"
+        ],
         outputs=[
-            TaskOutput(TaskOutputSource.WORKER_DIRECTORY, filePattern=output_file),
-            TaskOutput(TaskOutputSource.PROCESS_OUTPUT, uploadOnFailed=True)
+            TaskOutput.from_worker_directory(output_file, True),
+            TaskOutput.from_task_process()
         ]
     )
 
@@ -196,28 +185,31 @@ client.work_client.add_tasks_to_task_group_by_name(
     [generate_task(k + "_image", v, k + "_" + source_picture_file) for k, v in conversions.items()]
 )
 
-files = [source_picture_file]
-files.extend([k + "_" + source_picture_file for k, v in conversions.items()])
-files.append("montage_" + source_picture_file)
-files = " ".join(["/yd_working/" + f for f in files])
-
 montage_task_name = "MontageImage"
-client.work_client.add_tasks_to_task_group_by_name(namespace, work_requirement.name, montage_task_group_name, [
+image_montage_tasks = [
     Task(
         name=montage_task_name,
         taskType="docker",
         inputs=[
-            TaskInput(TaskInputSource.TASK_NAMESPACE, source_picture_file),
-            TaskInput(TaskInputSource.TASK_NAMESPACE, f"{work_requirement.name}/**/*_{source_picture_file}")
+            TaskInput.from_task_namespace(source_picture_file),
+            TaskInput.from_task_namespace(f"{work_requirement.name}/**/*_{source_picture_file}")
         ],
         flattenInputPaths=FlattenPath.FILE_NAME_ONLY,
-        taskData="v4tech/imagemagick montage -geometry 450 " + files,
+        arguments=[
+            "v4tech/imagemagick", "montage", "-geometry", "450",
+            f"/yd_working/{source_picture_file}",
+            *[f"/yd_working/{k}_{source_picture_file}" for k, v in conversions.items()],
+            f"/yd_working/{montage_picture_file}",
+        ],
         outputs=[
-            TaskOutput(TaskOutputSource.WORKER_DIRECTORY, filePattern=montage_picture_file),
-            TaskOutput(TaskOutputSource.PROCESS_OUTPUT, uploadOnFailed=True)
+            TaskOutput.from_worker_directory(montage_picture_file),
+            TaskOutput.from_task_process()
         ]
     )
-])
+]
+
+client.work_client.add_tasks_to_task_group_by_name(namespace, work_requirement.name, montage_task_group_name, image_montage_tasks)
+
 markdown("Added TASKS to", link_entity(url, work_requirement))
 
 # %% [markdown]
@@ -237,7 +229,7 @@ def on_update(work_req: WorkRequirement):
 
 
 markdown("Waiting for WORK REQUIREMENT to complete...")
-listener = DelegatedSubscriptionEventListener(on_update, lambda e: None, lambda: None)
+listener = DelegatedSubscriptionEventListener(on_update)
 client.work_client.add_work_requirement_listener(work_requirement, listener)
 work_requirement = client.work_client.get_work_requirement_helper(work_requirement)\
     .when_requirement_matches(lambda wr: wr.status.is_finished())\

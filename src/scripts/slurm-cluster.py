@@ -22,19 +22,16 @@
 # %%
 import os
 
-from pathlib import Path
-from datetime import timedelta
-
 from yellowdog_client import PlatformClient
 from yellowdog_client.common.server_sent_events import DelegatedSubscriptionEventListener
-from yellowdog_client.model import ProvisionedWorkerPoolProperties, NodeWorkerTarget, NodeWorkerTargetType, \
-    WorkerPoolNodeConfiguration, NodeType, NodeSlotNumbering, NodeRunCommandAction, NodeIdFilter, NodeEvent, \
+from yellowdog_client.model import ProvisionedWorkerPoolProperties, NodeWorkerTarget, WorkerPoolNodeConfiguration, \
+    NodeType, NodeSlotNumbering, NodeRunCommandAction, NodeIdFilter, NodeEvent, \
     NodeActionGroup, NodeWriteFileAction, NodeCreateWorkersAction, ComputeRequirementTemplateUsage, \
-    NoRegisteredWorkersShutdownCondition, ServicesSchema, ApiKey, ComputeRequirementDynamicTemplate, \
-    StringAttributeConstraint, WorkRequirement, TaskGroup, Task, TaskOutput, RunSpecification, TaskStatus, \
-    WorkRequirementStatus, TaskOutputSource, WorkerClaimBehaviour, MachineImageFamilySearch
+    ServicesSchema, ApiKey, ComputeRequirementDynamicTemplate, StringAttributeConstraint, WorkRequirement, TaskGroup, \
+    Task, TaskOutput, RunSpecification, TaskStatus, WorkRequirementStatus
 
-from utils.common import generate_unique_name, markdown, link, link_entity, use_template, script_relative_path
+from utils.common import generate_unique_name, markdown, link, link_entity, use_template, script_relative_path, \
+    get_image_family_id
 
 key = os.environ['KEY']
 secret = os.environ['SECRET']
@@ -48,30 +45,14 @@ tasks_per_slurmd_node = 5
 
 run_id = generate_unique_name(namespace)
 
-client = PlatformClient.create(
-    ServicesSchema(defaultUrl=url),
-    ApiKey(key, secret)
-)
+client = PlatformClient.create(ServicesSchema(defaultUrl=url), ApiKey(key, secret))
 
-image_family = "yd-agent-slurm"
-
-images = client.images_client.search_image_families(MachineImageFamilySearch(
-    includePublic=True,
-    namespace="YellowDog",
-    familyName=image_family
-))
-
-images = [image for image in images if image.name == image_family]
-
-if not images:
-    raise Exception("Unable to find ID for image family: " + image_family)
-elif len(images) > 1:
-    raise Exception("Multiple matching image families found")
+image_family_id = get_image_family_id(client, "yd-agent-slurm")
 
 default_template = ComputeRequirementDynamicTemplate(
     name=run_id,
     strategyType='co.yellowdog.platform.model.SingleSourceProvisionStrategy',
-    imagesId=images[0].id,
+    imagesId=image_family_id,
     constraints=[
         StringAttributeConstraint(attribute='source.provider', anyOf={'AWS'}),
         StringAttributeConstraint(attribute='source.instanceType', anyOf={"t3a.small"})
@@ -99,8 +80,7 @@ with use_template(client, template_id, default_template) as template_id:
             targetInstanceCount=total_nodes,
         ),
         ProvisionedWorkerPoolProperties(
-            bootTimeLimit=timedelta(hours=3),
-            createNodeWorkers=NodeWorkerTarget(targetCount=0, targetType=NodeWorkerTargetType.PER_NODE),
+            createNodeWorkers=NodeWorkerTarget.per_node(0),
             workerTag=run_id,
             autoShutdown=auto_shutdown,
             nodeConfiguration=WorkerPoolNodeConfiguration(
@@ -113,8 +93,7 @@ with use_template(client, template_id, default_template) as template_id:
                         NodeActionGroup([
                             NodeWriteFileAction(
                                 path=data_file_name,
-                                content=Path(script_relative_path(
-                                    'resources/startup_nodes.json.mustache')).read_text(),
+                                content=script_relative_path('resources/startup_nodes.json.mustache').read_text(),
                                 nodeTypes=["slurmctld"]
                             ),
                             NodeRunCommandAction(
@@ -145,7 +124,7 @@ with use_template(client, template_id, default_template) as template_id:
                         NodeActionGroup([
                             NodeWriteFileAction(
                                 path=data_file_name,
-                                content=Path(script_relative_path('resources/added_nodes.json.mustache')).read_text(),
+                                content=script_relative_path('resources/added_nodes.json.mustache').read_text(),
                                 nodeTypes=["slurmctld"]
                             ),
                             NodeRunCommandAction(
@@ -187,11 +166,10 @@ work_requirement = client.work_client.add_work_requirement(WorkRequirement(
     taskGroups=[TaskGroup(
         name="tasks",
         runSpecification=RunSpecification(
-            minimumQueueConcurrency=1,
-            idealQueueConcurrency=1,
-            workerClaimBehaviour=WorkerClaimBehaviour.MAINTAIN_IDEAL,
             taskTypes=[task_type],
-            shareWorkers=False,
+            minWorkers=1,
+            maxWorkers=1,
+            exclusiveWorkers=True,
             maximumTaskRetries=3,
             workerTags=[run_id]
         )
@@ -211,7 +189,7 @@ def generate_task() -> Task:
         name=generate_unique_name(namespace),
         taskType=task_type,
         arguments=["-N", str(slurmd_nodes), "bash", "-c", "echo Hello, world from $(hostname)!"],
-        outputs=[TaskOutput(TaskOutputSource.PROCESS_OUTPUT, uploadOnFailed=True)]
+        outputs=[TaskOutput.from_task_process()]
     )
 
 
@@ -239,12 +217,14 @@ def on_update(work_req: WorkRequirement):
 
 
 markdown("Waiting for WORK REQUIREMENT to complete...")
-listener = DelegatedSubscriptionEventListener(on_update, lambda e: None, lambda: None)
+listener = DelegatedSubscriptionEventListener(on_update)
 client.work_client.add_work_requirement_listener(work_requirement, listener)
 work_requirement = client.work_client.get_work_requirement_helper(work_requirement)\
     .when_requirement_matches(lambda wr: wr.status.is_finished())\
     .result()
-client.work_client.remove_work_requirement_listener(listener)
+
+client.close()
+
 if work_requirement.status != WorkRequirementStatus.COMPLETED:
     raise Exception("WORK REQUIREMENT did not complete. Status: " + str(work_requirement.status))
 
