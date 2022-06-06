@@ -11,10 +11,10 @@ RUN chmod +x /usr/bin/tini
 COPY requirements.txt /build/requirements.txt
 RUN --mount=type=secret,id=netrc,dst=/root/.netrc pip3 install --no-cache-dir -U -r /build/requirements.txt --extra-index-url "$PYPI_INDEX_URL"
 
-COPY src /demo/src
-COPY LICENSE /demo/src/LICENSE
+COPY src /src
+COPY LICENSE /src/LICENSE
 COPY docker /docker
 
-WORKDIR /demo
+WORKDIR /
 
 ENTRYPOINT ["/usr/bin/tini", "-g", "--", "/docker/docker-entrypoint.sh"]

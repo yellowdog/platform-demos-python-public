@@ -100,7 +100,7 @@ def image(path: str, text: Optional[str] = None) -> str:
     elif text == path:
         return path
     else:
-        return '%s available at: %s' % (text, path)
+        return '%s has been downloaded to: %s' % (text, path)
 
 
 entities = {

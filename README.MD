@@ -44,14 +44,16 @@ point at our production SAAS offering i.e. https://portal.yellowdog.co/api.
 
 ## Running on Docker
 
-Run with:
+Note that some demos will download files so that you can see the output of work performed by the YellowDog scheduler. When running inside docker, these will not be accessible to the host, so you must create a directory on the host, and share this with the docker container as a volume. After a demo is complete, look inside this directory to find any output files.
 
-    docker run -p8888:8888 yellowdogco/platform-demos-python-public COMMAND --key KEY --secret SECRET [--url URL]
+    mkdir /DIR
+    docker run -p8888:8888 -v /DIR:/out yellowdogco/platform-demos-python-public COMMAND --key KEY --secret SECRET [--url URL]
 
 For example:
 
-    docker run -p8888:8888 yellowdogco/platform-demos-python-public image-montage --key foo --secret bar
-    docker run -p8888:8888 yellowdogco/platform-demos-python-public jupyter --key foo --secret bar --url https://foo.yellowdog.co/api
+    mkdir /tmp/demos
+    docker run -p8888:8888 -v /tmp/demos:/out yellowdogco/platform-demos-python-public image-montage --key foo --secret bar
+    docker run -p8888:8888 -v /tmp/demos:/out yellowdogco/platform-demos-python-public jupyter --key foo --secret bar --url https://foo.yellowdog.co/api
 
 ## Running on your machine
 

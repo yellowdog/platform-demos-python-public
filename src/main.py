@@ -91,5 +91,4 @@ for demo in demos:
 
 args = parser.parse_args()
 
-os.chdir(os.path.dirname(__file__))
 args.func(args)

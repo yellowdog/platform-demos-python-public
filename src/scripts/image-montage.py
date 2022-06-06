@@ -21,7 +21,9 @@
 
 # %%
 import os
+import urllib.parse
 from datetime import timedelta
+from pathlib import Path
 
 from yellowdog_client import PlatformClient
 from yellowdog_client.common.server_sent_events import DelegatedSubscriptionEventListener
@@ -202,7 +204,7 @@ image_montage_tasks = [
             f"/yd_working/{montage_picture_file}",
         ],
         outputs=[
-            TaskOutput.from_worker_directory(montage_picture_file),
+            TaskOutput.from_worker_directory(montage_picture_file, required=True),
             TaskOutput.from_task_process()
         ]
     )
@@ -243,14 +245,13 @@ if work_requirement.status != WorkRequirementStatus.COMPLETED:
 
 # %%
 
-output_path = "out"
-if not os.path.exists(output_path):
-    os.makedirs(output_path)
+output_path = Path("out").resolve()
+output_path.mkdir(parents=True, exist_ok=True)
 
 markdown("Waiting for output picture to download from Object Store...")
 output_object = f"{work_requirement.name}/{montage_task_group_name}/{montage_task_name}/{montage_picture_file}"
 session = client.object_store_client\
-    .create_download_session(namespace, output_object, output_path)
+    .create_download_session(namespace, output_object, str(output_path), montage_picture_file)
 session.start()
 session = session.when_status_matches(lambda status: status.is_finished()).result()
 
@@ -260,6 +261,7 @@ if session.status != FileTransferStatus.Completed:
 stats = session.get_statistics()
 markdown(f"Download {session.status.name.lower()} ({stats.bytes_transferred}B downloaded)")
 
-markdown(image(os.path.join(output_path, output_object), "Output picture"))
+markdown(image(str(output_path / montage_picture_file), "The final picture"))
+markdown("It can also be accessed via the Portal at:", link(url, f"#/objects/{namespace}/{urllib.parse.quote_plus(output_object)}?object=true"))
 
 client.close()
