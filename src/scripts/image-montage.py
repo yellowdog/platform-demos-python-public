@@ -72,11 +72,12 @@ source_picture_file = source_picture_path.name
 client.object_store_client.start_transfers()
 session = client.object_store_client.create_upload_session(namespace, str(source_picture_path))
 markdown("Waiting for source picture to upload to Object Store...")
+session.bind(on_error=lambda error_args: markdown(f"Error uploading file: {error_args.error_type} - {error_args.message}. {''.join(error_args.detail)}"))
 session.start()
 session = session.when_status_matches(lambda status: status.is_finished()).result()
 
 if session.status != FileTransferStatus.Completed:
-    raise Exception("Source picture failed to upload. Status: " + session)
+    raise Exception(f"Source picture failed to upload. Status: {session.status}")
 
 stats = session.get_statistics()
 markdown(link(
@@ -217,8 +218,8 @@ markdown("Added TASKS to", link_entity(url, work_requirement))
 # %% [markdown]
 # # Wait for the Work Requirement to finish
 
+# %%
 
-#%%
 
 def on_update(work_req: WorkRequirement):
     completed = 0
@@ -252,11 +253,12 @@ markdown("Waiting for output picture to download from Object Store...")
 output_object = f"{work_requirement.name}/{montage_task_group_name}/{montage_task_name}/{montage_picture_file}"
 session = client.object_store_client\
     .create_download_session(namespace, output_object, str(output_path), montage_picture_file)
+session.bind(on_error=lambda error_args: markdown(f"Error uploading file: {error_args.error_type} - {error_args.message}. {''.join(error_args.detail)}"))
 session.start()
 session = session.when_status_matches(lambda status: status.is_finished()).result()
 
 if session.status != FileTransferStatus.Completed:
-    raise Exception("Output picture failed to download. Status: " + session)
+    raise Exception(f"Output picture failed to download. Status: {session.status}")
 
 stats = session.get_statistics()
 markdown(f"Download {session.status.name.lower()} ({stats.bytes_transferred}B downloaded)")
