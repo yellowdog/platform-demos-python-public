@@ -1,7 +1,7 @@
 import importlib
 import os
 import sys
-import pathlib
+from pathlib import Path
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
 from jupyterlab.labapp import LabApp
@@ -16,17 +16,18 @@ def executable(name: str) -> str:
 
 
 def call_jupyter(arguments):
-    pathlib.Path("notebooks").mkdir(exist_ok=True)
+    notebooks_path = Path("src", "notebooks")
+    notebooks_path.mkdir(exist_ok=True)
 
     for d in demos:
-        notebook = os.path.join("notebooks", f"{d}.ipynb")
-        script = os.path.join("scripts", f"{d}.py")
+        notebook = str(notebooks_path / f"{d}.ipynb")
+        script = str(Path("src", "scripts", f"{d}.py"))
         jupytext(["--output", notebook, script])
         TrustNotebookApp.launch_instance([notebook])
         TrustNotebookApp.clear_instance()
 
     set_environment(arguments)
-    os.chdir("notebooks")
+    os.chdir(notebooks_path)
     LabApp.launch_instance(["--port=8888", "--no-browser", "--ip=0.0.0.0", "--ServerApp.token=''",
                             "--ServerApp.password=''", "--allow-root"])
 
