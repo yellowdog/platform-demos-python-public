@@ -27,10 +27,10 @@ from pathlib import Path
 
 from yellowdog_client import PlatformClient
 from yellowdog_client.common.server_sent_events import DelegatedSubscriptionEventListener
-from yellowdog_client.object_store.model import FileTransferStatus
-from yellowdog_client.model import ServicesSchema, ApiKey, ComputeRequirementDynamicTemplate,\
-    StringAttributeConstraint, WorkRequirement, TaskGroup, RunSpecification, Task, TaskInput, TaskOutput, FlattenPath,\
+from yellowdog_client.model import ServicesSchema, ApiKey, ComputeRequirementDynamicTemplate, \
+    StringAttributeConstraint, WorkRequirement, TaskGroup, RunSpecification, Task, TaskInput, TaskOutput, FlattenPath, \
     ComputeRequirementTemplateUsage, ProvisionedWorkerPoolProperties, WorkRequirementStatus, TaskStatus
+from yellowdog_client.object_store.model import FileTransferStatus
 
 from utils.common import generate_unique_name, markdown, link, link_entity, use_template, image, script_relative_path, \
     get_image_family_id
@@ -234,8 +234,8 @@ def on_update(work_req: WorkRequirement):
 markdown("Waiting for WORK REQUIREMENT to complete...")
 listener = DelegatedSubscriptionEventListener(on_update)
 client.work_client.add_work_requirement_listener(work_requirement, listener)
-work_requirement = client.work_client.get_work_requirement_helper(work_requirement)\
-    .when_requirement_matches(lambda wr: wr.status.is_finished())\
+work_requirement = client.work_client.get_work_requirement_helper(work_requirement) \
+    .when_requirement_matches(lambda wr: wr.status.finished) \
     .result()
 client.work_client.remove_work_requirement_listener(listener)
 if work_requirement.status != WorkRequirementStatus.COMPLETED:

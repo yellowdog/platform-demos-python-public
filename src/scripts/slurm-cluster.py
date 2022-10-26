@@ -219,8 +219,8 @@ def on_update(work_req: WorkRequirement):
 markdown("Waiting for WORK REQUIREMENT to complete...")
 listener = DelegatedSubscriptionEventListener(on_update)
 client.work_client.add_work_requirement_listener(work_requirement, listener)
-work_requirement = client.work_client.get_work_requirement_helper(work_requirement)\
-    .when_requirement_matches(lambda wr: wr.status.is_finished())\
+work_requirement = client.work_client.get_work_requirement_helper(work_requirement) \
+    .when_requirement_matches(lambda wr: wr.status.finished) \
     .result()
 
 client.close()
