@@ -1,12 +1,10 @@
 import contextlib
-import os
 import re
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Union
 from urllib.parse import urlparse
-
 
 from IPython import get_ipython
 from IPython.display import display, Markdown
@@ -16,7 +14,7 @@ from yellowdog_client.model import ComputeRequirementTemplate, WorkRequirement, 
 
 
 def generate_unique_name(prefix: str) -> str:
-    return (prefix + "_" + str(uuid.uuid4()))[:50]
+    return (prefix + "-" + str(uuid.uuid4()))[:50]
 
 
 @contextlib.contextmanager
@@ -38,7 +36,7 @@ def use_template(
 def get_image_family_id(client: PlatformClient, image_family: str) -> str:
     image_families = client.images_client.search_image_families(MachineImageFamilySearch(
         includePublic=True,
-        namespace="YellowDog",
+        namespace="yellowdog",
         familyName=image_family
     ))
 
@@ -66,7 +64,6 @@ class Output:
 
 
 def markdown(*args: Union[str, Output]) -> None:
-
     if console_supports_markdown:
         display(Markdown(" ".join(args)))
     else:
@@ -91,7 +88,6 @@ def link(base_url: str, url_suffix: str = "", text: Optional[str] = None) -> str
 
 
 def image(path: str, text: Optional[str] = None) -> str:
-
     if not text:
         text = path
 

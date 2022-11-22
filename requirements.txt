@@ -1,4 +1,4 @@
 jupyterlab==3.0.16
 jupytext==1.11.4
 argparse==1.4.0
-yellowdog-sdk==3.6.19
+yellowdog-sdk==4.0.5

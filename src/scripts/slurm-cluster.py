@@ -22,6 +22,8 @@
 # %%
 import os
 
+from utils.common import generate_unique_name, markdown, link, link_entity, use_template, script_relative_path, \
+    get_image_family_id
 from yellowdog_client import PlatformClient
 from yellowdog_client.common.server_sent_events import DelegatedSubscriptionEventListener
 from yellowdog_client.model import ProvisionedWorkerPoolProperties, NodeWorkerTarget, WorkerPoolNodeConfiguration, \
@@ -29,9 +31,6 @@ from yellowdog_client.model import ProvisionedWorkerPoolProperties, NodeWorkerTa
     NodeActionGroup, NodeWriteFileAction, NodeCreateWorkersAction, ComputeRequirementTemplateUsage, \
     ServicesSchema, ApiKey, ComputeRequirementDynamicTemplate, StringAttributeConstraint, WorkRequirement, TaskGroup, \
     Task, TaskOutput, RunSpecification, TaskStatus, WorkRequirementStatus
-
-from utils.common import generate_unique_name, markdown, link, link_entity, use_template, script_relative_path, \
-    get_image_family_id
 
 key = os.environ['KEY']
 secret = os.environ['SECRET']
@@ -55,7 +54,7 @@ default_template = ComputeRequirementDynamicTemplate(
     imagesId=image_family_id,
     constraints=[
         StringAttributeConstraint(attribute='source.provider', anyOf={'AWS'}),
-        StringAttributeConstraint(attribute='source.instanceType', anyOf={"t3a.small"})
+        StringAttributeConstraint(attribute='source.instance-type', anyOf={"t3a.small"})
     ],
 )
 
@@ -64,7 +63,7 @@ markdown("Configured to run against", link(url))
 # %% [markdown]
 # # Provision Worker Pool
 
-#%%
+# %%
 
 slurmctl_nodes = 1
 total_nodes = slurmd_nodes + slurmctl_nodes
@@ -155,7 +154,7 @@ markdown("Added", link_entity(url, worker_pool))
 # %% [markdown]
 # # Add Work Requirement
 
-#%%
+# %%
 
 task_type = "srun"
 total_tasks = tasks_per_slurmd_node * slurmd_nodes
@@ -177,6 +176,7 @@ work_requirement = client.work_client.add_work_requirement(WorkRequirement(
 ))
 
 markdown("Added", link_entity(url, work_requirement))
+
 
 # %% [markdown]
 # # Add Tasks to Work Requirement
@@ -204,7 +204,7 @@ markdown("Added TASKS to", link_entity(url, work_requirement))
 # # Wait for the Work Requirement to finish
 
 
-#%%
+# %%
 
 def on_update(work_req: WorkRequirement):
     completed = 0

@@ -40,7 +40,7 @@ def call_python(arguments):
 def set_environment(arguments):
     namespace = arguments.namespace
     if not namespace:
-        namespace = arguments.command.replace("-", "_") + "_demo"
+        namespace = arguments.command + "-demo"
 
     os.environ["URL"] = arguments.url
     os.environ["KEY"] = arguments.key
