@@ -34,13 +34,17 @@ def use_template(
 
 
 def get_image_family_id(client: PlatformClient, image_family: str) -> str:
-    image_families = client.images_client.search_image_families(MachineImageFamilySearch(
+
+    image_family_search = MachineImageFamilySearch(
         includePublic=True,
         namespace="yellowdog",
         familyName=image_family
-    ))
+    )
 
-    image_families = [i for i in image_families if i.name == image_family]
+    image_families = []
+    for image_family_summary in client.images_client.get_image_families(image_family_search).iterate():
+        if image_family_summary.name == image_family:
+            image_families.append(image_family_summary)
 
     if not image_families:
         raise Exception("Unable to find ID for image family: " + image_family)
