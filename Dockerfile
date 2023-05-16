@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM python:3.8-slim-buster
+FROM python:3.9-slim-buster
 
 ARG PYPI_INDEX_URL=https://pypi.python.org/simple
 
