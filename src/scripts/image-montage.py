@@ -32,7 +32,7 @@ from yellowdog_client.common.server_sent_events import DelegatedSubscriptionEven
 from yellowdog_client.model import ServicesSchema, ApiKey, ComputeRequirementDynamicTemplate, \
     StringAttributeConstraint, WorkRequirement, TaskGroup, RunSpecification, Task, TaskInput, TaskOutput, FlattenPath, \
     ComputeRequirementTemplateUsage, ProvisionedWorkerPoolProperties, WorkRequirementStatus, TaskStatus, \
-    TaskInputVerification
+    TaskInputVerification, AutoShutdown
 from yellowdog_client.object_store.model import FileTransferStatus
 
 key = os.environ['KEY']
@@ -78,8 +78,8 @@ with use_template(client, template_id, default_template) as template_id:
         ),
         ProvisionedWorkerPoolProperties(
             workerTag=run_id,
-            nodeIdleTimeLimit=timedelta(0),
-            autoShutdown=auto_shutdown
+            idleNodeShutdown=AutoShutdown(timeout=timedelta(0)),
+            idlePoolShutdown=AutoShutdown(timeout=timedelta(0)) if auto_shutdown else AutoShutdown(enabled=False)
         )
     )
 

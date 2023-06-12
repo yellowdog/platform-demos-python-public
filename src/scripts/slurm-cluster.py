@@ -21,6 +21,7 @@
 
 # %%
 import os
+from datetime import timedelta
 
 from utils.common import generate_unique_name, markdown, link, link_entity, use_template, script_relative_path, \
     get_image_family_id
@@ -30,7 +31,7 @@ from yellowdog_client.model import ProvisionedWorkerPoolProperties, NodeWorkerTa
     NodeType, NodeSlotNumbering, NodeRunCommandAction, NodeIdFilter, NodeEvent, \
     NodeActionGroup, NodeWriteFileAction, NodeCreateWorkersAction, ComputeRequirementTemplateUsage, \
     ServicesSchema, ApiKey, ComputeRequirementDynamicTemplate, StringAttributeConstraint, WorkRequirement, TaskGroup, \
-    Task, TaskOutput, RunSpecification, TaskStatus, WorkRequirementStatus
+    Task, TaskOutput, RunSpecification, TaskStatus, WorkRequirementStatus, AutoShutdown
 
 key = os.environ['KEY']
 secret = os.environ['SECRET']
@@ -81,7 +82,8 @@ with use_template(client, template_id, default_template) as template_id:
         ProvisionedWorkerPoolProperties(
             createNodeWorkers=NodeWorkerTarget.per_node(0),
             workerTag=run_id,
-            autoShutdown=auto_shutdown,
+            idleNodeShutdown=AutoShutdown(timeout=timedelta(0)),
+            idlePoolShutdown=AutoShutdown(timeout=timedelta(0)) if auto_shutdown else AutoShutdown(enabled=False),
             nodeConfiguration=WorkerPoolNodeConfiguration(
                 nodeTypes=[
                     NodeType("slurmctld", 1),
