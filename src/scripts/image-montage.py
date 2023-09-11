@@ -24,6 +24,7 @@ import os
 import urllib.parse
 from datetime import timedelta
 from pathlib import Path
+from typing import List
 
 from utils.common import generate_unique_name, markdown, link, link_entity, use_template, image, script_relative_path, \
     get_image_family_id
@@ -120,7 +121,7 @@ markdown("Added", link_entity(url, work_requirement))
 # %%
 
 
-def generate_task(task_name: str, conversion: str, output_file: str) -> Task:
+def generate_task(task_name: str, conversion: List[str], output_file: str) -> Task:
     return Task(
         name=task_name,
         taskType="docker",
@@ -128,7 +129,7 @@ def generate_task(task_name: str, conversion: str, output_file: str) -> Task:
         arguments=[
             "v4tech/imagemagick",
             "convert",
-            conversion,
+            *conversion,
             f"/yd_working/{source_picture_file}",
             f"/yd_working/{output_file}"
         ],
@@ -142,13 +143,13 @@ def generate_task(task_name: str, conversion: str, output_file: str) -> Task:
 montage_picture_file = "montage_" + source_picture_file
 
 conversions = {
-    "negate": "-negate",
-    "paint": "-paint 10",
-    "charcoal": "-charcoal 2",
-    "pixelate": "-scale 2%% -scale 600x400",
-    "vignette": "-background black -vignette 0x1",
-    "blur": "-morphology Convolve Blur:0x25",
-    "mask": "-fuzz 15%% -transparent white -alpha extract -negate"
+    "negate": ["-negate"],
+    "paint": ["-paint", "10"],
+    "charcoal": ["-charcoal", "2"],
+    "pixelate": ["-scale", "2%%", "-scale", "600x400"],
+    "vignette": ["-background", "black", "-vignette", "0x1"],
+    "blur": ["-morphology", "Convolve", "Blur:0x25"],
+    "mask": ["-fuzz", "15%%", "-transparent", "white", "-alpha", "extract", "-negate"],
 }
 
 client.work_client.add_tasks_to_task_group_by_name(
